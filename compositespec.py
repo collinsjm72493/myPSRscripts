@@ -76,7 +76,7 @@ while con1!=1:
         con1=1
         print 'Stacked SALT spectra will NOT be plotted.'
     else:
-        print 'Invalid input.  Try again.'
+        print 'Invalid input.  Line 79.  Try again.'
 
 # Shift the SALT spectra by the calculated velocity
 if plotsalt=='y':
@@ -186,7 +186,7 @@ while con2!=1:
         con2=1
         print 'The stacked Gemini spectra will NOT be plotted.'
     else:
-        print 'Invalid input.  Try again.'
+        print 'Invalid input.  Line 189.  Try again.'
 
 # If prompt was yes, plot the spectra
 if plotgem=='y':
@@ -457,14 +457,29 @@ for x in range(len(saltfiles)):
                 print 'That is unfortunate.  Quitting script.'
                 sys.exit('Unacceptable spectrum normalization and/or fitting.')
             else:
-                print 'Invalid input (line 426).  Try again.'
+                print 'Invalid input (line 460).  Try again.'
 
-        # Save the figure (I will avoid prompting here for the sake of streamlining)
+        # Save the figure; prompt for overwrite if applicable
         comparefig='./salt_reduced/checkspec'+obsno+'.png'
         if os.path.exists(comparefig):
-            os.remove(comparefig)
-        wait=raw_input('Press <return> when you are ready to save the comparison figure.')
-        pylab.savefig(comparefig)
+            print 'Warning: File '+comparefig+' already exists.'
+            ccon=0
+            while ccon!=1:
+                ovw=raw_input('Would you like to overwrite this file? (y/n, case sensitive) ')
+                if ovw=='y':
+                    ccon=1
+                    print 'The image file will be overwritten.'
+                    os.remove(comparefig)
+                    wait=raw_input('Press <return> when you are ready to save the comparison figure.')
+                    pylab.savefig(comparefig)
+                elif ovw=='n':
+                    ccon=1
+                    print 'The image file will not be updated.'
+                else:
+                    print 'Invalid input.  Line 479.  Try again.'
+        else:
+            wait=raw_input('Press <return> when you are ready to save the comparison figure.')
+            pylab.savefig(comparefig)
         
         print '-------------------------------------------------------------'
 
@@ -488,9 +503,46 @@ for n in range(len(compflux)):
     pylab.xlabel('Wavelength (A)')
     pylab.ylabel('Flux (Arbitrary)')
 
-    # Save the figure
+    # Save the figure; prompt for overwrite if applicable
     compositefig='./salt_reduced/composite'+str(n+1)+'spectraSALT.png'
     if os.path.exists(compositefig):
-        os.remove(compositefig)
-    wait2=raw_input('Press <return> when ready to save the composite figure.')
-    pylab.savefig(compositefig)
+        print 'Warning: File '+compositefig+' already exists.'
+        occon=0
+        while occon!=1:
+            ovr=raw_input('Would you like to overwrite this file? (y/n, case sensitive) ')
+            if ovr=='y':
+                occon=1
+                print 'Overwriting file '+compositefig+' ...'
+                os.remove(compositefig)
+                wait2=raw_input('Press <return> when ready to save the composite figure.')    
+                pylab.savefig(compositefig)
+            elif ovr=='n':
+                occon=1
+                print 'The file will not be updated.'
+            else:
+                print 'Invalid input.  Line 523.  Try again.'
+    else:
+        print 'Saving file: '+compositefig
+        pylab.savefig(compositefig)
+
+# Save the final composite spectrum data to a table
+ct=Table([waves1,compflux[-1],compvar[-1]],names=('Wavelength','Composite Flux','Composite Variance'))
+comptable='./salt_reduced/compositespec.hdf5'
+if os.path.exists(comptable):
+    print 'Warning: File name '+comptable+' already exists.'
+    owcon=0
+    while owcon!=1:
+        ow=raw_input('Would you like to overwrite this file? (y/n, case sensitive) ')
+        if ow=='y':
+            owcon=1
+            print 'The composite spectrum table will be overwritten.'
+            ct.write(comptable,path='OVA',overwrite=True)
+        elif ow=='n':
+            owcon=1
+            print 'The composite spectrum table will not be updated.'
+        else:
+            print 'Invalid input.  Line 544.  Try again.'
+else:
+    print 'Writing composite flux and variance to file: '+comptable
+    ct.write(comptable,path='OVA')
+            
