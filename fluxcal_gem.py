@@ -108,9 +108,9 @@ for n in range(len(infiles)):
             for b in range(vardat.shape[0]):
                 vardats.append(vardat[b,q])
             vardat1[0,q]=(np.mean(vardats))/(b+1)
-        varcal=vardat1*(polycal**2)
+        varcal=vardat1
     else:
-        varcal=vardat*(polycal**2)
+        varcal=vardat
 
     #Save calibrated file to FITS
     outfits='cetgsgS'+imgno+'.fits'
