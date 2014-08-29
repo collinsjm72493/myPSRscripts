@@ -99,9 +99,23 @@ for n in range(len(infiles)):
         else:
             print 'Invalid input.  Try again.'
     
+    # Error propagation; have to adjust the 'VAR' extension
+    vardat=ef['VAR'].data
+    if vardat.shape[0]!=1:
+        vardat1=np.zeros((1,vardat.shape[1]))
+        for q in range(vardat.shape[1]):
+            vardats=[]
+            for b in range(vardat.shape[0]):
+                vardats.append(vardat[r,c])
+            vardat1[0,c]=np.mean(vardats)
+        varcal=vardat1*(polycal**2)
+    else:
+        varcal=vardat*(polycal**2)
+
     #Save calibrated file to FITS
     outfits='cetgsgS'+imgno+'.fits'
     ef['SCI'].data=efcal
+    ef['VAR'].data=varcal
     if os.path.exists(outfits):
         print 'Warning: The output file %s already exists.' % outfits
         wcon=0
