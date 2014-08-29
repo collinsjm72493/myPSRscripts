@@ -184,6 +184,9 @@ def observe(model, wgrid, slit, seeing, overresolve, offset=0.):
     mconv = nd.convolve1d(mint, filt)
     return Table([wgrid, mconv], names=('w','flux'), meta={'filt': filt}),mconv,filt
 
+##################################################################################
+# All code below written by Justin Collins
+
 #Gaussian function definition, for calling by curve_fit
 def gauss(x,a,b,x0,sigma):
     return a+(b*np.exp(-(x-x0)**2/(2*(sigma**2))))
