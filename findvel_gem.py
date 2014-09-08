@@ -185,8 +185,8 @@ def observe(model, wgrid, slit, seeing, overresolve, offset=0.):
     mconv = nd.convolve1d(mint, filt)
     return Table([wgrid, mconv], names=('w','flux'), meta={'filt': filt}),mconv,filt
 
-########################################################################
-# All code below written by Justin Collins
+################################################################
+# Code below written by Justin Collins
 
 #Gaussian function definition, for calling by curve_fit
 def gauss(x,a,b,x0,sigma):
@@ -205,13 +205,14 @@ while con2!=1:
         print 'Input must be an integer.  Try again.'
 
 #Build list of files to work on from a directory
-infiles=glob.glob('cetgsg*.fits')
+#infiles=glob.glob('cetgsg*.fits')
+infiles=glob.glob('cetgsg*_mod.fits')
 if len(infiles)==0:
     sys.exit('The indicated path '+prodir+' contains no extracted data files.')
 for k in range(len(infiles)):
     #Get corresponding raw and wavelength-calibrated files
     dat=infiles[k]
-    datno=dat.split('cetgsgS20130')[1].split('.fits')[0]
+    datno=dat.split('cetgsgS20130')[1].split('_mod.fits')[0]
     if re.search('613',datno)!=None:
         setno='set2/'
     elif re.search('712',datno)!=None:
@@ -340,8 +341,9 @@ for k in range(len(infiles)):
     pylab.xlabel('Wavelength (A)'); pylab.ylabel('Flux (erg/s/cm**2/A)'); pylab.legend(loc='best')
 
     #Prompt to save the image
-    figfile=datno+'_primscaledmodel.png'
+    figfile=datno+'_primscaledmodel_mod.png'
     con3=0
+    print 'The file name of the current file to be saved is: '+figfile
     while con3!=1:
         imsave=raw_input('Would you like to save the image of the scaled model? (y/n, case sensitive) ')
         if imsave=='y':
@@ -374,8 +376,9 @@ for k in range(len(infiles)):
     outtable2=Table([waves,mod],names=('Wavelength','Prim Scaled Model'),meta={'name':'Model Data'})
     outtable2.add_column(pseecol)
     outtable2.add_column(polycol)
-    outfile=datno+'_model.hdf5'
+    outfile=datno+'_model_mod.hdf5'
     month,day,year=time.strftime('%x').split('/')
+    print 'The file name of the outgoing table is: '+outfile
     if os.path.exists(outfile):
         print 'Warning: File %s already exists.' % outfile
         con5=0
@@ -408,21 +411,24 @@ for k in range(len(infiles)):
     c=ind1
     d=ind2
     waves2=waves[c:d]
-    fprim=fdat1[c:d]
+    fprim=np.ma.array(fdat1[c:d],mask=(fdat1[c:d]<=0))
     ch=np.zeros_like(v)
     err=sdat[c:d]
     for j in range(len(v)):
         #Calculate chi**2 for an array of velocities
         q=interpolate.InterpolatedUnivariateSpline(waves+(waves*v[j]/(2.9979E5)),mod)
-        zz=np.polyfit(waves2[-np.isnan(fprim)],(fprim[-np.isnan(fprim)]/q(waves2[-np.isnan(fprim)])),fitorder)
+        zz=np.ma.polyfit(waves2,(fprim/q(waves2)),fitorder)
         if np.isnan(zz).any():
             sys.exit('Polyfit returned NaN values.  Polyfit coefficients are: '+str(zz))
         pp=np.poly1d(zz)
+        shiftmod=q(waves)*pp(waves)
         res=np.zeros_like(waves)
         for m in range(c,d):           
-            if fdat1[m]>=0 and pp(waves[m])>=0 and err[m-c]>0:
-                res[m-c]=float((((fdat1[m]-q(waves[m])*pp(waves[m]))/(err[m-c]))**2))
-        ch[j]=float(res.sum())
+            #if fdat1[m]>=0 and pp(waves[m])>=0 and err[m-c]>0:
+                #res[m-c]=float((((fdat1[m]-(q(waves[m])*pp(waves[m])))/(err[m-c]))**2))
+            if np.isnan(fprim[m-c])==False:
+                res[m-c]=(fprim[m-c]-shiftmod[m])/(err[m-c])
+        ch[j]=np.sum(res**2)
 
     #Ding!
     print('\a')
@@ -430,7 +436,7 @@ for k in range(len(infiles)):
     # Plot the distribution of chi**2 results
     pylab.figure(); pylab.plot(v,ch); pylab.suptitle('Chi**2 Results for Primary, File '+dat)
     pylab.xlabel('Velocity (km/s)'); pylab.ylabel('Chi**2')
-    pchifile='chi2'+datno+'_'+month+day+year+'.png'
+    pchifile='chi2'+datno+'_'+month+day+year+'_mod.png'
     if os.path.exists(pchifile):
         print 'Warning: File name %s already exists.' % pchifile
         chcon=0
@@ -449,18 +455,27 @@ for k in range(len(infiles)):
         pylab.savefig(pchifile)
             
     #Fit a parabola around the minimum of the chi**2 array
-    ymin1=v[np.argmin(ch)]
-    para=np.polyfit(v[np.argmin(ch)-6:np.argmin(ch)+7],ch[np.argmin(ch)-6:np.argmin(ch)+7],2)
+    chind=np.argmin(ch)
+    ymin1=v[chind]
     print 'The velocity corresponding to the minimum chi**2 value for the primary object from file '+dat+' is %s' % ymin1
-    xx=np.arange(v[np.argmin(ch)-6],v[np.argmin(ch)+6],1)
-    cc=para[0]*xx**2+para[1]*xx+para[2]
-    ymin=xx[np.argmin(cc)]
+    leftpt=chind-10
+    rightpt=chind+10
+    para=np.polyfit(v[leftpt:rightpt],ch[leftpt:rightpt],2)
+    xx=np.arange(v[leftpt],v[rightpt],0.1)
+    cc=(para[0]*(xx**2))+(para[1]*xx)+para[2]
+    ccind=np.argmin(cc)
+    ymin=xx[ccind]
 
     #Plot results and calculate uncertainty
     pylab.figure(); pylab.plot(xx,cc); pylab.suptitle('Parabolic Fit of Chi**2 Function for Primary Object from File '+dat)
     pylab.xlabel('Velocity (km/s)'); pylab.ylabel('Chi**2')
-    pylab.plot(xx,[cc[np.argmin(cc)]+1]*len(xx))
-    unc=np.abs((xx[np.argmin(np.abs(cc-(cc[np.argmin(cc)]+1)))])-(xx[np.argmin(cc)]))
+    pylab.plot(xx,[cc[ccind]+1]*len(xx))
+    # Save the figure of the parabola
+    parfig=datno+month+day+year+'_paramod.png'
+    if os.path.exists(parfig):
+        os.remove(parfig)
+    pylab.savefig(parfig)
+    unc=np.abs((xx[np.argmin(np.abs(cc-(cc[ccind]+1)))])-(xx[ccind]))
     print 'The radial velocity for the primary object in the '+datno+' observation is '+str(ymin)+' +/- %s km/s' % unc
             
     #Analyze the shift at this velocity
@@ -484,7 +499,7 @@ for k in range(len(infiles)):
     print 'The value of Chi**2 for the velocity of the primary object is %s ' % ch2
     
     #Prompt to save the residuals figure for the primary object
-    presfile='vshift'+datno+'.png'
+    presfile='vshift'+datno+'_mod.png'
     con5=0
     while con5!=1:
         pressave=raw_input('Would you like to save the image of the primary residuals? (y/n, case sensitive) ')
@@ -515,11 +530,11 @@ for k in range(len(infiles)):
             print 'Invalid input.  Try again.'
 
     #Write results to hdf5 table for all observations
-    print 'Writing results to rvtable.hdf5:'
+    print 'Writing results to rvtable_mod.hdf5:'
     et=float(f[0].header['EXPTIME'])
     gmjd=float(f[0].header['MJD-OBS'])+(0.5*et)
     rvdata=[datno,gmjd,ymin,unc]
-    rvtable='rvtable_gem.hdf5'
+    rvtable='rvtable_gem_mod.hdf5'
     if os.path.exists(rvtable):
         rv=Table.read(rvtable,path='OVA')
         for d in range(len(rv['Observation'])):
